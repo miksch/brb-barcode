@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Project specific
+.idea
+barcode_testbed.ipynb
+BRB_full_label.ai
