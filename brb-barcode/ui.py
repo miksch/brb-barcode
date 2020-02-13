@@ -1,14 +1,17 @@
-import pandas as pd
-import barcode
-from barcode.writer import ImageWriter
-import datetime as dt
-import numpy as np
-import panel as pn
-import param
-#import matplotlib.pyplot as plt
-from PIL import Image, ImageFont, ImageDraw
-import math
-import sqlite3
+try:
+    import pandas as pd
+    import barcode
+    from barcode.writer import ImageWriter
+    import datetime as dt
+    import numpy as np
+    import panel as pn
+    import param
+    from PIL import Image, ImageFont, ImageDraw
+    import math
+    import sqlite3
+    import os
+except Exception as e:
+    print(e)
 
 #pn.extension()
 
@@ -88,17 +91,76 @@ class Bottle_UI(param.Parameterized):
         # Set up barcode class
         bar_class = barcode.get_barcode_class('code128')
         bar_writer = barcode.writer.ImageWriter()
+        font_file = 'verdana.ttf'
             
         # Set up each sheet of barcodes
         num_codes = len(self.new_bottle_df.index)
         #num_sheets = math.ceil(num_codes / self.codes_per_sheet)
-        
+
         # Loop through each code and create a barcode
         for i, record in enumerate(self.new_bottle_df.index):
-            
-            cin_str = self.new_bottle_df['cin_str'][record]
-            test_barcode = bar_class(cin_str, writer = bar_writer)
-            test_barcode.save(f"label_singles/{cin_str}", options={'write_text':True})
+
+            # Construct string to be written to the left of logo
+            contact = "www.BearRiverBottling.com\ninfo@bearriverbottling.com\n"
+            size = self.bottle_size.split()[0]
+            flavor = self.flavor
+            if self.batch_parent=='Mr_Q':
+                sauce_type = 'BBQ Sauce'
+            else:
+                sauce_type = 'Hot Sauce'
+            flavor_type = f"{flavor}\n{sauce_type} ({size})\n"
+            cin = self.new_bottle_df['cin_str'][record]
+            full_text = f"{flavor_type}\n{cin}\n\n{contact}"
+
+            # Set up widths and heights of images used in label
+            background_img = Image.new('RGB', (787, 600), color = (255, 255, 255))
+            text_img = Image.new('RGB', (475, 370), color = (255, 255, 255))
+            logo_img = Image.new('RGB', (312, 370), color = (255, 255, 255))
+            subbar_img = Image.new('RGB', (787, 50), color = (255, 255, 255))
+
+            # Read in logo (1"x1" 300 dpi)
+            logo = Image.open('data/logo.png')
+            logo_img.paste(logo, (6, 45))
+
+            # Get text width for the name, cin, contact info
+            # based on https://stackoverflow.com/questions/54031588/make-to-make-text-size-auto-adjust-to-an-image-with-pil
+            fontsize=16
+            img_fraction = 1-(20/475.) # Fraction of text_img taken by text
+            font = ImageFont.truetype(font_file, fontsize)
+            text_draw = ImageDraw.Draw(text_img)
+
+            while text_draw.textsize(full_text, font)[0] < img_fraction*text_img.size[0]:
+                # iterate until the text size is just larger than the criteria
+                fontsize += 1
+                font = ImageFont.truetype(font_file, fontsize)
+
+            # Make sure font fits within specified area, then create text image
+            fontsize -= 1
+            font = ImageFont.truetype(font_file, fontsize)
+            text_draw.text((10,50), full_text, align='center', font=font, fill=(0, 0, 0))
+
+            # Create barcode
+            barcode_pil = bar_class(cin, writer = bar_writer)
+            barcode_pil.default_writer_options['write_text'] = False
+            barcode_pil = barcode_pil.render().resize((767, 210))
+
+            # Create cin number underneath barcode
+            font_subbar = ImageFont.truetype(font_file, 25)
+            subbar_draw = ImageDraw.Draw(subbar_img)
+            subbar_width = subbar_draw.textsize(cin, font_subbar)[0]
+            subbar_draw.text(((787-subbar_width)/2,5), cin, align='center', font=font_subbar, fill=(0,0,0))
+
+            # Merge all of the images together to final label
+            background_img.paste(text_img, (0,0))
+            background_img.paste(logo_img, (475, 0))
+            background_img.paste(barcode_pil, (10, 350))
+            background_img.paste(subbar_img, (0, 550))
+
+            # Save single label to folder labeled with date and time of creation
+            batch = self.new_bottle_df['batch_id'][record]
+            out_path = f'label_singles/{batch:04}'
+            os.makedirs(out_path, exist_ok=True)
+            background_img.save(os.path.join(out_path,f'{cin}.png'), 'PNG')
         
         # Write out new values to database and create new set of values
         self.new_bottle_df.to_sql('cin_record', self.conn, if_exists='append', index='record')
