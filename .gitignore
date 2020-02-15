@@ -106,4 +106,5 @@ venv.bak/
 # Project specific
 .idea
 barcode_testbed.ipynb
-BRB_full_label.ai
+/brb-barcode/label_sheets/*
+/brb-barcode/label_singles/*
