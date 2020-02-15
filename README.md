@@ -30,6 +30,12 @@ be created.
 copy the "cin_record_clean.db" into the same directory, rename it as "cin_record.db", then 
 restart and run "create_barcode.ipynb" again to load the new database.
 
+#### Updating Database
+All ID numbers used in creating the CINs are stored in the database "data/cin_record.db", along
+with the CIN record. If more flavors, sizes, cook locations, etc. need to be added, use a 
+database browsing software (e.g. https://sqlitebrowser.org/) to edit the various ID and string
+representations. 
+
 #### To-Do
 - Add pictures to "Usage" section
 - Add environment.yml file
